@@ -40,7 +40,7 @@
 
 ### 1. 환경 설정 및 복제
 ```bash
-$git clone [https://github.com/Team-Carrot/dativus-frontend.git$](https://github.com/Team-Carrot/dativus-frontend.git$) cd dativus-frontend
+$git clone [https://github.com/carrot-Dativus/dativus-frontend.git$](https://github.com/carrot-Dativus/dativus-frontend.git$) cd dativus-frontend
 ```
 
 ### 2. 패키지 설치
