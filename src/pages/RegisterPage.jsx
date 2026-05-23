@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { apiClient } from '../api/axiosInstance';
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -11,23 +12,21 @@ export default function RegisterPage() {
   const handleRegister = async (e) => {
     e.preventDefault();
     if (password !== passwordCheck) {
-      alert("🚨 비밀번호와 비밀번호 확인이 다릅니다!");
+      alert('🚨 비밀번호와 비밀번호 확인이 다릅니다!');
       return;
     }
     try {
-      const response = await fetch('http://127.0.0.1:8080/api/v1/users/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, username })
-      });
+      // ✅ 하드코딩 → apiClient.post
+      const response = await apiClient.post('/api/v1/users/register', { email, password, username });
+
       if (response.ok) {
-        alert("✅ 회원가입 성공! 로그인해 주세요.");
-        navigate('/'); // 가입 성공 시 다시 로그인 화면으로 이동
+        alert('✅ 회원가입 성공! 로그인해 주세요.');
+        navigate('/');
       } else {
-        alert("🚨 회원가입 실패");
+        alert('🚨 회원가입 실패');
       }
     } catch (error) {
-      alert("❌ 서버 연결 실패");
+      alert('❌ 서버 연결 실패');
     }
   };
 

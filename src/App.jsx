@@ -1,22 +1,39 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
-import ChatPage from './pages/ChatPage'; // 💡 추가!
-import MyPage from './pages/MyPage';     // 💡 추가!
+import ChatPage from './pages/ChatPage'; 
+import MyPage from './pages/MyPage';     
+import ProtectedRoute from './components/ProtectedRoute'; // 💡 인가 검문소(방어막) 요원 호출!
 import './App.css';
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* 🔓 누구나 접근 가능한 일반 공개 구역 */}
         <Route path="/" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         
-        {/* 로그인 성공 시 기본으로 채팅방으로 렌더링되게 변경 */}
-        <Route path="/chat" element={<ChatPage />} />
-        <Route path="/mypage" element={<MyPage />} />
+        {/* 🔒 출입증(토큰)이 있어야만 입장이 허가되는 철통 보안 구역 */}
+        <Route 
+          path="/chat" 
+          element={
+            <ProtectedRoute>
+              <ChatPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/mypage" 
+          element={
+            <ProtectedRoute>
+              <MyPage />
+            </ProtectedRoute>
+          } 
+        />
         
-        <Route path="*" element={<Navigate to="/" />} />
+        {/* 🚨 그 외 존재하지 않는 모든 구역은 즉시 로그인 화면으로 이송 */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

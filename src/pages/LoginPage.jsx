@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { apiClient } from '../api/axiosInstance';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -7,7 +8,6 @@ export default function LoginPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // 토큰과 워크스페이스 ID가 모두 있으면 챗 페이지로!
     if (localStorage.getItem('token') && localStorage.getItem('workspace_id')) {
       navigate('/chat');
     }
@@ -16,26 +16,21 @@ export default function LoginPage() {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://127.0.0.1:8080/api/v1/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
+      // ✅ 하드코딩 + 작은따옴표 버그 → apiClient.post
+      const response = await apiClient.post('/api/v1/auth/login', { email, password });
 
       if (response.ok) {
         const data = await response.json();
-        
-        // 💡 [핵심 복구 포인트] 스프링이 준 토큰, 유저ID, 팀ID를 모두 금고(localStorage)에 저장합니다!
         localStorage.setItem('token', data.access_token);
+        localStorage.setItem('refresh_token', data.refresh_token);
         localStorage.setItem('user_id', data.user_id);
-        localStorage.setItem('workspace_id', data.workspace_id); 
-        
-        navigate('/chat'); // 저장 완료 후 채팅방으로 진입!
+        localStorage.setItem('workspace_id', data.workspace_id);
+        navigate('/chat');
       } else {
-        alert("🚨 로그인 실패: 이메일이나 비밀번호를 확인하세요.");
+        alert('🚨 로그인 실패: 이메일이나 비밀번호를 확인하세요.');
       }
     } catch (error) {
-      alert("❌ 서버와 연결할 수 없습니다.");
+      alert('❌ 서버와 연결할 수 없습니다.');
     }
   };
 
