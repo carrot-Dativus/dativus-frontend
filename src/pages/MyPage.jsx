@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useMyPage } from '../hooks/useMyPage';
 import { apiClient } from '../api/axiosInstance';
+import dativusLogo from '../assets/Dativus_logo.png';
 import PersonaCard from '../components/mypage/PersonaCard';
 import QualityDashboard from '../components/mypage/QualityDashboard';
 
@@ -18,7 +19,7 @@ export default function MyPage() {
   return (
     <>
       <header className="header" style={{ display: 'flex', justifyContent: 'space-between', padding: '20px 50px', borderBottom: '1px solid #eee' }}>
-        <div className="logo-text" onClick={() => navigate('/chat')} style={{ cursor: 'pointer', fontSize: '20px', fontWeight: 'bold' }}>Dativus</div>
+        <img src={dativusLogo} alt="Dativus" onClick={() => navigate('/chat')} style={{ height: '30px', objectFit: 'contain', cursor: 'pointer' }} />
         <div className="top-nav">
           <button className="btn-top-login" onClick={() => apiClient.logout()}>로그아웃</button>
         </div>

@@ -1,6 +1,7 @@
 export default function Sidebar({
   setIsUploadOpen, setIsDocManagerOpen, setIsAgentCreateOpen,
-  agentList, newTeamName, setNewTeamName, handleCreateTeam,
+  agentList, editingAgent, setEditingAgent, handleUpdateAgent, handleDeleteAgent,
+  newTeamName, setNewTeamName, handleCreateTeam,
   inviteCode, setInviteCode, handleJoinTeam, workspaces, workspaceId
 }) {
   return (
@@ -24,9 +25,41 @@ export default function Sidebar({
             <div style={{ fontSize: '12px', color: '#888', textAlign: 'center', padding: '10px 0' }}>등록된 자아가 없습니다.</div>
           ) : (
             agentList.map(agent => (
-              <div key={agent.id} style={{ padding: '10px', backgroundColor: '#f9f9f9', borderRadius: '8px', border: '1px solid #ddd', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div style={{ fontWeight: 'bold', fontSize: '13px' }}>{agent.name}</div>
-                <div style={{ fontSize: '11px', color: '#666', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{agent.description}</div>
+              <div key={agent.id} style={{ padding: '10px', backgroundColor: '#f9f9f9', borderRadius: '8px', border: '1px solid #ddd' }}>
+                {editingAgent?.id === agent.id ? (
+                  // 인라인 수정 폼
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <input
+                      value={editingAgent.name}
+                      onChange={e => setEditingAgent({ ...editingAgent, name: e.target.value })}
+                      style={{ padding: '5px 8px', borderRadius: '4px', border: '1px solid #aaa', fontSize: '12px' }}
+                    />
+                    <textarea
+                      rows={3}
+                      value={editingAgent.description}
+                      onChange={e => setEditingAgent({ ...editingAgent, description: e.target.value })}
+                      style={{ padding: '5px 8px', borderRadius: '4px', border: '1px solid #aaa', fontSize: '11px', resize: 'none' }}
+                    />
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button onClick={() => handleUpdateAgent()} style={{ flex: 1, padding: '4px', background: '#000', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>저장</button>
+                      <button onClick={() => setEditingAgent(null)} style={{ flex: 1, padding: '4px', background: '#eee', color: '#333', border: 'none', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>취소</button>
+                    </div>
+                  </div>
+                ) : (
+                  // 일반 표시
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 'bold', fontSize: '13px' }}>{agent.name}</div>
+                      <div style={{ fontSize: '11px', color: '#666', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{agent.description}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px', marginLeft: '6px', flexShrink: 0 }}>
+                      <button onClick={() => setEditingAgent({ id: agent.id, name: agent.name, description: agent.description, agentType: agent.agentType })}
+                        style={{ background: 'none', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', padding: '2px 5px' }}>✏️</button>
+                      <button onClick={() => handleDeleteAgent(agent.id)}
+                        style={{ background: 'none', border: '1px solid #ffcccc', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', padding: '2px 5px' }}>🗑️</button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))
           )}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/axiosInstance';
+import dativusLogo from '../assets/Dativus_logo.png';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -37,7 +38,7 @@ export default function LoginPage() {
   return (
     <>
       <header className="header">
-        <div className="logo-text">Dativus</div>
+        <img src={dativusLogo} alt="Dativus" style={{ height: '30px', objectFit: 'contain' }} />
         <div className="top-nav">
           <span style={{ cursor: 'pointer' }} onClick={() => navigate('/register')}>회원가입</span>
           <button className="btn-top-login">로그인</button>

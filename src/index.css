@@ -109,3 +109,14 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+/* code block (pre > code) 전용 — SyntaxHighlighter 스타일 보존 */
+pre code {
+  display: block !important;
+  color: inherit !important;
+  background: transparent !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  font-size: inherit !important;
+  white-space: pre !important;
+}

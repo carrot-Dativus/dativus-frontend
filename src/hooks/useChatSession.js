@@ -10,6 +10,8 @@ export function useChatSession(workspaceId, currentUserId) {
   const [agentLogs, setAgentLogs] = useState([]);
   const [dashboardData, setDashboardData] = useState(null);
   const [clarifyData, setClarifyData] = useState(null);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [currentTrace, setCurrentTrace] = useState('');
 
   // 세션 초기화
   useEffect(() => {
@@ -49,7 +51,7 @@ export function useChatSession(workspaceId, currentUserId) {
   }, [sessionId, currentUserId]);
 
   // 메시지 전송 + AI 스트리밍
-  const sendMessage = async ({ userQuery, currentTab, selectedAgent }) => {
+  const sendMessage = async ({ userQuery, currentTab, selectedAgent, agentList = [] }) => {
     if (!userQuery.trim() || !sessionId) return;
 
     const isPrivateMode = currentTab === 'PRIVATE';
@@ -76,6 +78,9 @@ export function useChatSession(workspaceId, currentUserId) {
     let finalTokens = 0;
 
     // 격리구역 1: AI 스트리밍
+    setIsStreaming(true);
+    setCurrentTrace('');
+    setAgentLogs([]);
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${AI_BASE_URL}/api/v1/chat/stream`, {
@@ -89,8 +94,13 @@ export function useChatSession(workspaceId, currentUserId) {
             role: m.sender === 'user' ? 'user' : 'ai',
             content: (m.text || m.content || '').slice(0, 400),
           })),
-          target_agent_name: selectedAgent?.name || null,
-          target_agent_prompt: selectedAgent?.description || null,
+          // 빌트인 선택 → force_agent / 커스텀 수동 선택 → target_agent_* / 자동(Dati) → custom_agents_list로 자동 매칭
+          force_agent: selectedAgent?._builtin ? selectedAgent.id : null,
+          target_agent_name: (!selectedAgent?._builtin && selectedAgent?.name) ? selectedAgent.name : null,
+          target_agent_prompt: (!selectedAgent?._builtin && selectedAgent?.description) ? selectedAgent.description : null,
+          custom_agents_list: (!selectedAgent && agentList.length > 0)
+            ? agentList.filter(a => !a._builtin).map(a => ({ name: a.name, description: a.description }))
+            : [],
           existing_dashboard: (() => {
             try { return JSON.parse(sessionStorage.getItem('dativus_canvas_data') || 'null'); }
             catch { return null; }
@@ -100,15 +110,27 @@ export function useChatSession(workspaceId, currentUserId) {
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
+      let sseBuffer = '';  // 청크 경계에서 잘린 이벤트를 보관하는 버퍼
+      let streamDone = false;
 
-      while (true) {
+      while (!streamDone) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        for (const event of chunk.split('\n\n')) {
-          if (!event.startsWith('data: ')) continue;
-          const dataText = event.substring(6);
-          if (dataText === '[DONE]') break;
+
+        // 버퍼에 누적 후 \n\n 기준으로 완성된 이벤트만 처리
+        sseBuffer += decoder.decode(value, { stream: true });
+        const events = sseBuffer.split('\n\n');
+        sseBuffer = events.pop() ?? '';  // 마지막 불완전한 조각은 다음 청크까지 보관
+
+        for (const event of events) {
+          // 멀티라인 SSE 지원: 이벤트 내 모든 data: 필드를 \n으로 합산
+          const dataLines = event.split('\n')
+            .filter(l => l.startsWith('data: '))
+            .map(l => l.substring(6));
+          if (dataLines.length === 0) continue;
+          const dataText = dataLines.join('\n').replace(/\n$/, '');
+
+          if (dataText === '[DONE]') { streamDone = true; break; }
           if (dataText.startsWith('[CLARIFY]')) {
             try {
               const parsed = JSON.parse(dataText.substring(9));
@@ -131,11 +153,14 @@ export function useChatSession(workspaceId, currentUserId) {
           } else if (dataText.startsWith('[LOG]')) {
             const logMsg = dataText.substring(5);
             setAgentLogs(prev => [...prev, logMsg]);
+            if (aiFullText === '') setCurrentTrace(logMsg);
             if (logMsg.includes('소요 시간:')) {
               finalLatency = parseFloat(logMsg.match(/소요 시간:\s*([\d.]+)초/)?.[1] || 0);
               finalTokens = parseInt(logMsg.match(/소모 토큰:\s*(\d+)/)?.[1] || 0);
             }
           } else {
+            if (aiFullText === '') setCurrentTrace('');
+            // dataText가 빈 문자열이면 백엔드가 \n 전송한 것 → 줄바꿈으로 해석
             aiFullText += (dataText === '' ? '\n' : dataText);
             targetSetMessages(prev => {
               const newMsgs = [...prev];
@@ -154,6 +179,9 @@ export function useChatSession(workspaceId, currentUserId) {
           return newMsgs;
         });
       }
+    } finally {
+      setIsStreaming(false);
+      setCurrentTrace('');
     }
 
     // 격리구역 2: DB 저장 (역질문 응답은 저장 불필요, 실패해도 채팅창엔 영향 없음)
@@ -201,6 +229,8 @@ export function useChatSession(workspaceId, currentUserId) {
     }
   };
 
+  const resetDashboard = () => setDashboardData(null);
+
   return {
     sessionId,
     messages,
@@ -212,5 +242,8 @@ export function useChatSession(workspaceId, currentUserId) {
     sendMessage,
     shareToTeam,
     sendFeedback,
+    isStreaming,
+    currentTrace,
+    resetDashboard,
   };
 }
