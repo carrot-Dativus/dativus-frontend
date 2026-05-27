@@ -44,15 +44,15 @@ export function useDocuments(workspaceId, isDocManagerOpen) {
         body: formData,
       });
       if (response.ok) {
-        alert('✅ 파일 접수 완료!');
+        alert('파일 접수 완료!');
         setSelectedFile(null);
         fetchDocuments();
         onSuccess?.();
       } else {
-        alert('🚨 업로드 실패');
+        alert('업로드 실패');
       }
     } catch (error) {
-      alert(`❌ 오류: ${error.message}`);
+      alert(`오류: ${error.message}`);
     } finally {
       setIsUploading(false);
     }
@@ -62,7 +62,7 @@ export function useDocuments(workspaceId, isDocManagerOpen) {
     if (!window.confirm('정말로 이 문서를 삭제하시겠습니까?')) return;
     try {
       const res = await apiClient.delete(`/api/v1/documents/${docId}`);
-      if (res.ok) { alert('🗑️ 삭제되었습니다!'); fetchDocuments(); }
+      if (res.ok) { alert('삭제되었습니다!'); fetchDocuments(); }
     } catch {
       alert('삭제 통신 오류!');
     }

@@ -10,7 +10,7 @@ const BUILTIN_AGENTS = [
 
 export function useAgents(currentUserId) {
   const [agentList, setAgentList] = useState([]);
-  const [agentForm, setAgentForm] = useState({ name: '', description: '', agentType: 'LOCAL' });
+  const [agentForm, setAgentForm] = useState({ name: '', description: '', agentType: 'LOCAL', threshold: 0.38 });
   const [selectedAgentId, setSelectedAgentId] = useState('');
 
   const fetchAgents = async () => {
@@ -23,7 +23,7 @@ export function useAgents(currentUserId) {
     }
   };
 
-  const [editingAgent, setEditingAgent] = useState(null); // { id, name, description, agentType }
+  const [editingAgent, setEditingAgent] = useState(null); // { id, name, description, agentType, threshold }
 
   const handleCreateAgent = async (onSuccess) => {
     if (!agentForm.name.trim() || !agentForm.description.trim()) {
@@ -36,10 +36,11 @@ export function useAgents(currentUserId) {
         name: agentForm.name,
         description: agentForm.description,
         agentType: agentForm.agentType,
+        threshold: agentForm.threshold,
       });
       if (res.ok) {
-        alert('🤖 새로운 자아가 각인되었습니다!');
-        setAgentForm({ name: '', description: '', agentType: 'LOCAL' });
+        alert('새로운 자아가 각인되었습니다!');
+        setAgentForm({ name: '', description: '', agentType: 'LOCAL', threshold: 0.38 });
         fetchAgents();
         onSuccess?.();
       } else {
@@ -60,6 +61,7 @@ export function useAgents(currentUserId) {
         name: editingAgent.name,
         description: editingAgent.description,
         agentType: editingAgent.agentType,
+        threshold: editingAgent.threshold,
       });
       if (res.ok) {
         setEditingAgent(null);

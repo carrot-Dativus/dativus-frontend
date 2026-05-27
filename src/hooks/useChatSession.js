@@ -1,10 +1,54 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient } from '../api/axiosInstance';
+import { useTeamSync } from './useTeamSync';
 
 const AI_BASE_URL = import.meta.env.VITE_AI_BASE_URL || 'http://127.0.0.1:8000';
 
-export function useChatSession(workspaceId, currentUserId) {
-  const [sessionId, setSessionId] = useState(null);
+
+// ── localStorage 캐시 헬퍼 ──────────────────────────────────────────────────
+const sessionCacheKey = (sessionId) => `dativus_chat_${sessionId}`;
+
+function saveMsgs(key, msgs) {
+  try { localStorage.setItem(key, JSON.stringify(msgs)); } catch {}
+}
+function loadMsgs(key) {
+  try { const d = localStorage.getItem(key); return d ? JSON.parse(d) : null; } catch { return null; }
+}
+
+// ── DB 응답 변환 (캐시가 없을 때만 사용) ────────────────────────────────────
+function transformMsg(msg) {
+  const senderType = msg.senderType ?? (msg.sender === 'user' ? 'USER' : 'LOCAL_AI');
+  const senderName = msg.senderName ?? '';
+  const content    = msg.content ?? msg.text ?? '';
+  return {
+    sender:    senderType === 'USER' ? 'user' : senderName.startsWith('AGENT:') ? 'custom_agent' : 'ai',
+    text:      content,
+    agentName: senderName.startsWith('AGENT:') ? senderName.slice(6) : undefined,
+    senderName: senderType === 'USER' ? senderName : undefined,
+  };
+}
+
+function sortAndTransform(data) {
+  const list = Array.isArray(data) ? [...data] : [];
+  list.sort((a, b) => {
+    // 1순위: createdAt (턴 간 순서)
+    if (a.createdAt && b.createdAt) {
+      const dt = new Date(a.createdAt) - new Date(b.createdAt);
+      if (dt !== 0) return dt;
+    }
+    // 2순위: messageOrder (같은 턴 내 순서 — 0=사용자, 1=AI, 2+=에이전트)
+    if (a.messageOrder != null && b.messageOrder != null && a.messageOrder !== b.messageOrder)
+      return a.messageOrder - b.messageOrder;
+    // 3순위: id
+    if (a.id != null && b.id != null) return a.id - b.id;
+    return 0;
+  });
+  return list.map(transformMsg);
+}
+
+// teamSessionId: 팀 탭에서 보여줄 세션 (팀 채팅방 선택)
+// privateSessionId: 개인 공간 탭에서 보여줄 세션 (개인 AI 채팅 선택)
+export function useChatSession(workspaceId, currentUserId, teamSessionId, privateSessionId) {
   const [messages, setMessages] = useState([]);
   const [privateMessages, setPrivateMessages] = useState([]);
   const [agentLogs, setAgentLogs] = useState([]);
@@ -13,67 +57,114 @@ export function useChatSession(workspaceId, currentUserId) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [currentTrace, setCurrentTrace] = useState('');
 
-  // 세션 초기화
+  // 팀 탭 실시간 동기화 (WebSocket) — 현재 선택된 채널 메시지만 수신
+  const teamSessionIdRef = useRef(teamSessionId);
+  useEffect(() => { teamSessionIdRef.current = teamSessionId; }, [teamSessionId]);
+
+  const handleTeamMessage = useCallback((msg) => {
+    if (teamSessionIdRef.current && msg.sessionId && msg.sessionId !== teamSessionIdRef.current) return;
+    // WS 페이로드의 senderName을 메시지 객체에 포함
+    setMessages(prev => [...prev, { ...msg, senderName: msg.senderName || '' }]);
+  }, []);
+  useTeamSync(workspaceId, currentUserId, handleTeamMessage);
+
+  // "로드 완료" ref — 세션 전환 중에는 null로 두어 잘못된 캐시 저장 방지
+  const teamLoadedRef = useRef(null);
+  const privateLoadedRef = useRef(null);
+
+  // 팀 세션 전환 → messages 초기화 후 로드
   useEffect(() => {
-    if (!workspaceId || workspaceId === 'null') return;
+    setMessages([]);
+    teamLoadedRef.current = null;
+    if (!teamSessionId) return;
+    const key = `${sessionCacheKey(teamSessionId)}_team`;
+    const cached = loadMsgs(key);
+    if (cached?.length > 0) {
+      teamLoadedRef.current = teamSessionId;
+      setMessages(cached);
+      return;
+    }
+    apiClient.get(`/api/v1/chats/session/${teamSessionId}/messages?isPrivate=false`)
+      .then(res => res.ok ? res.json() : [])
+      .then(data => {
+        teamLoadedRef.current = teamSessionId;
+        setMessages(sortAndTransform(data));
+      })
+      .catch(err => console.error(err));
+  }, [teamSessionId]);
 
-    const initSession = async () => {
-      try {
-        const res = await apiClient.post('/api/v1/chats/session', {
-          workspaceId,
-          title: '기본 채팅방',
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setSessionId(data.sessionId);
-        }
-      } catch (error) {
-        console.error('세션 초기화 실패:', error);
-      }
-    };
-
-    initSession();
-  }, [workspaceId]);
-
-  // 과거 메시지 불러오기
+  // 개인 세션 전환 → privateMessages 초기화 후 로드
   useEffect(() => {
-    if (!sessionId) return;
-
-    apiClient.get(`/api/v1/chats/session/${sessionId}/messages?isPrivate=false`)
+    setPrivateMessages([]);
+    privateLoadedRef.current = null;
+    if (!privateSessionId) return;
+    const key = sessionCacheKey(privateSessionId);
+    const cached = loadMsgs(key);
+    if (cached?.length > 0) {
+      privateLoadedRef.current = privateSessionId;
+      setPrivateMessages(cached);
+      return;
+    }
+    apiClient.get(`/api/v1/chats/session/${privateSessionId}/messages?isPrivate=true`)
       .then(res => res.ok ? res.json() : [])
-      .then(data => setMessages(data))
+      .then(data => {
+        privateLoadedRef.current = privateSessionId;
+        setPrivateMessages(sortAndTransform(data));
+      })
       .catch(err => console.error(err));
+  }, [privateSessionId]);
 
-    apiClient.get(`/api/v1/chats/session/${sessionId}/messages?isPrivate=true&userId=${currentUserId}`)
-      .then(res => res.ok ? res.json() : [])
-      .then(data => setPrivateMessages(data))
-      .catch(err => console.error(err));
-  }, [sessionId, currentUserId]);
+  // 캐시 저장 — 로드 완료된 세션만 저장 (전환 중 잘못된 키로 저장 방지)
+  useEffect(() => {
+    if (teamSessionId && teamSessionId === teamLoadedRef.current && messages.length > 0)
+      saveMsgs(`${sessionCacheKey(teamSessionId)}_team`, messages);
+  }, [messages, teamSessionId]);
+
+  useEffect(() => {
+    if (privateSessionId && privateSessionId === privateLoadedRef.current && privateMessages.length > 0)
+      saveMsgs(sessionCacheKey(privateSessionId), privateMessages);
+  }, [privateMessages, privateSessionId]);
 
   // 메시지 전송 + AI 스트리밍
-  const sendMessage = async ({ userQuery, currentTab, selectedAgent, agentList = [] }) => {
-    if (!userQuery.trim() || !sessionId) return;
-
+  const sendMessage = async ({ userQuery, currentTab, selectedAgent, agentList = [], existingDashboard = null, channelMode = 'AI' }) => {
     const isPrivateMode = currentTab === 'PRIVATE';
+    const isChatOnly = channelMode === 'CHAT';
+    const activeSessionId = isPrivateMode ? privateSessionId : teamSessionId;
+    if (!userQuery.trim() || !activeSessionId) return;
+
+    const personaMemo = localStorage.getItem('persona_memo') || '';
+    const myName = localStorage.getItem('username') || '팀원';
+
     const targetSetMessages = isPrivateMode ? setPrivateMessages : setMessages;
     const currentMessageArray = isPrivateMode ? privateMessages : messages;
 
-    targetSetMessages(prev => [...prev, { sender: 'user', text: userQuery }]);
-    targetSetMessages(prev => [...prev, { sender: 'ai', text: '' }]);
+    targetSetMessages(prev => [...prev, { sender: 'user', text: userQuery, senderName: myName }]);
+    if (!isChatOnly) targetSetMessages(prev => [...prev, { sender: 'ai', text: '' }]);
 
-    // 사용자 메시지 DB 저장 (재로그인 시 복원을 위해)
-    apiClient.post('/api/v1/chats/messages', {
-      sessionId,
+    // 사용자 메시지 DB 저장
+    const userMsgSavePromise = apiClient.post('/api/v1/chats/messages', {
+      sessionId: activeSessionId,
       userId: currentUserId || '',
       senderType: 'USER',
-      senderName: '지휘관',
+      senderName: myName,
       content: userQuery.replace(/^\[skip\]\s*/g, ''),
       isPrivate: isPrivateMode,
       latency: 0,
       tokens: 0,
+      messageOrder: 0,
     }).catch(e => console.warn('사용자 메시지 저장 실패:', e));
 
-    let aiFullText = '';
+    // 팀 채팅 전용 채널: DB 저장만 하고 AI 호출 없이 종료
+    if (isChatOnly) {
+      await userMsgSavePromise;
+      return;
+    }
+
+    let aiFullText = '';              // 메인 답변 (DB 저장용)
+    let inMultiAgent = false;         // 다중 에이전트 스트리밍 중 여부
+    let currentAgentName = '';        // 현재 스트리밍 중인 에이전트 이름
+    let currentAgentText = '';        // 현재 에이전트 누적 텍스트
+    let completedAgentResponses = []; // 완료된 에이전트 응답 [{name, text}] — 메인 답변 저장 후 순서대로 저장
     let finalLatency = 0.0;
     let finalTokens = 0;
 
@@ -88,7 +179,7 @@ export function useChatSession(workspaceId, currentUserId) {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({
           query: userQuery,
-          session_id: sessionId,
+          session_id: activeSessionId,
           workspace_id: localStorage.getItem('workspace_id'),
           history: currentMessageArray.slice(-4).map(m => ({
             role: m.sender === 'user' ? 'user' : 'ai',
@@ -99,12 +190,10 @@ export function useChatSession(workspaceId, currentUserId) {
           target_agent_name: (!selectedAgent?._builtin && selectedAgent?.name) ? selectedAgent.name : null,
           target_agent_prompt: (!selectedAgent?._builtin && selectedAgent?.description) ? selectedAgent.description : null,
           custom_agents_list: (!selectedAgent && agentList.length > 0)
-            ? agentList.filter(a => !a._builtin).map(a => ({ name: a.name, description: a.description }))
+            ? agentList.filter(a => !a._builtin).map(a => ({ name: a.name, description: a.description, threshold: a.threshold ?? 0.38 }))
             : [],
-          existing_dashboard: (() => {
-            try { return JSON.parse(sessionStorage.getItem('dativus_canvas_data') || 'null'); }
-            catch { return null; }
-          })(),
+          persona_memo: personaMemo,
+          existing_dashboard: existingDashboard ?? null,
         }),
       });
 
@@ -150,6 +239,15 @@ export function useChatSession(workspaceId, currentUserId) {
             } catch (e) {
               console.warn('대시보드 JSON 파싱 실패:', e);
             }
+          } else if (dataText.startsWith('[ROUTE]')) {
+            const routeKey = dataText.substring(7);
+            const routeLabels = { general_agent: '일반', expert_agent: '전문가', coding_math_agent: '코딩/수학' };
+            const routeLabel = routeLabels[routeKey] || '일반';
+            apiClient.post('/api/v1/agents/usage', {
+              userId: currentUserId,
+              workspaceId,
+              agentName: routeLabel,
+            }).catch(() => {});
           } else if (dataText.startsWith('[LOG]')) {
             const logMsg = dataText.substring(5);
             setAgentLogs(prev => [...prev, logMsg]);
@@ -158,15 +256,47 @@ export function useChatSession(workspaceId, currentUserId) {
               finalLatency = parseFloat(logMsg.match(/소요 시간:\s*([\d.]+)초/)?.[1] || 0);
               finalTokens = parseInt(logMsg.match(/소모 토큰:\s*(\d+)/)?.[1] || 0);
             }
+          } else if (dataText.startsWith('[AGENT_START:')) {
+            // 이전 에이전트가 AGENT_END 없이 연속 시작되는 경우 대기열에 추가
+            if (currentAgentName && currentAgentText) {
+              completedAgentResponses.push({ name: currentAgentName, text: currentAgentText });
+            }
+            // 새 에이전트 버블 생성
+            const agentName = dataText.slice(13, -1);
+            inMultiAgent = true;
+            currentAgentName = agentName;
+            currentAgentText = '';
+            targetSetMessages(prev => [...prev, { sender: 'custom_agent', agentName, text: '' }]);
+          } else if (dataText === '[AGENT_END]') {
+            // 완료된 에이전트 응답을 대기열에 추가 (메인 답변 저장 후 순서대로 DB 저장)
+            if (currentAgentName && currentAgentText) {
+              completedAgentResponses.push({ name: currentAgentName, text: currentAgentText });
+              currentAgentName = '';
+              currentAgentText = '';
+            }
           } else {
-            if (aiFullText === '') setCurrentTrace('');
-            // dataText가 빈 문자열이면 백엔드가 \n 전송한 것 → 줄바꿈으로 해석
-            aiFullText += (dataText === '' ? '\n' : dataText);
-            targetSetMessages(prev => {
-              const newMsgs = [...prev];
-              newMsgs[newMsgs.length - 1].text = aiFullText;
-              return newMsgs;
-            });
+            if (aiFullText === '' && !inMultiAgent) setCurrentTrace('');
+            const chunk = dataText === '' ? '\n' : dataText;
+            if (!inMultiAgent) {
+              // 메인 답변 축적
+              aiFullText += chunk;
+              targetSetMessages(prev => {
+                const newMsgs = [...prev];
+                newMsgs[newMsgs.length - 1].text = aiFullText;
+                return newMsgs;
+              });
+            } else {
+              // 다중 에이전트 버블에 텍스트 추가 + DB 저장용 누적
+              currentAgentText += chunk;
+              targetSetMessages(prev => {
+                const newMsgs = [...prev];
+                newMsgs[newMsgs.length - 1] = {
+                  ...newMsgs[newMsgs.length - 1],
+                  text: newMsgs[newMsgs.length - 1].text + chunk,
+                };
+                return newMsgs;
+              });
+            }
           }
         }
       }
@@ -184,11 +314,13 @@ export function useChatSession(workspaceId, currentUserId) {
       setCurrentTrace('');
     }
 
-    // 격리구역 2: DB 저장 (역질문 응답은 저장 불필요, 실패해도 채팅창엔 영향 없음)
+    // 격리구역 2: DB 저장
     if (!aiFullText) return;
+    await userMsgSavePromise;
+    let msgOrder = 1;
     try {
       await apiClient.post('/api/v1/chats/messages', {
-        sessionId,
+        sessionId: activeSessionId,
         userId: currentUserId || '',
         senderType: 'LOCAL_AI',
         senderName: 'AI 어시스턴트',
@@ -196,9 +328,28 @@ export function useChatSession(workspaceId, currentUserId) {
         isPrivate: isPrivateMode,
         latency: finalLatency,
         tokens: finalTokens,
+        messageOrder: msgOrder,
       });
     } catch (e) {
       console.warn('DB 저장만 실패했습니다 (답변은 보존됨):', e);
+    }
+    for (const agent of completedAgentResponses) {
+      msgOrder += 1;
+      try {
+        await apiClient.post('/api/v1/chats/messages', {
+          sessionId: activeSessionId,
+          userId: currentUserId || '',
+          senderType: 'LOCAL_AI',
+          senderName: `AGENT:${agent.name}`,
+          content: agent.text,
+          isPrivate: isPrivateMode,
+          latency: 0,
+          tokens: 0,
+          messageOrder: msgOrder,
+        });
+      } catch (e) {
+        console.warn(`에이전트 메시지 저장 실패 (${agent.name}):`, e);
+      }
     }
   };
 
@@ -214,7 +365,7 @@ export function useChatSession(workspaceId, currentUserId) {
         isPrivate: false,
       });
       setMessages(prev => [...prev, { sender: 'ai', text: `[팀원 공유 메모]\n${content}` }]);
-      alert('📢 팀에 공유되었습니다!');
+      alert('팀에 공유되었습니다!');
     } catch {
       alert('공유 실패!');
     }
@@ -229,10 +380,18 @@ export function useChatSession(workspaceId, currentUserId) {
     }
   };
 
+  const removeMessage = useCallback((msg, isPrivate) => {
+    if (isPrivate) {
+      setPrivateMessages(prev => prev.filter(m => m !== msg));
+    } else {
+      setMessages(prev => prev.filter(m => m !== msg));
+    }
+  }, []);
+
   const resetDashboard = () => setDashboardData(null);
 
   return {
-    sessionId,
+    sessionId: teamSessionId,  // 팀 공유 등 기존 코드 호환용
     messages,
     privateMessages,
     agentLogs,
@@ -242,6 +401,7 @@ export function useChatSession(workspaceId, currentUserId) {
     sendMessage,
     shareToTeam,
     sendFeedback,
+    removeMessage,
     isStreaming,
     currentTrace,
     resetDashboard,

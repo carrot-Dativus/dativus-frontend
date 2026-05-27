@@ -66,6 +66,8 @@ body {
 
 .error-message { color: #ff3b3b; font-size: 12px; margin-bottom: 12px; }
 
+.chat-input::placeholder { color: #555; font-weight: 500; }
+
 /* 5. 반응형 조절 */
 @media (max-width: 480px) {
     .header { padding: 15px 20px; }

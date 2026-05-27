@@ -37,10 +37,10 @@ export function useWorkspace(currentUserId) {
         const data = await res.json();
         localStorage.setItem('token', data.access_token);
         localStorage.setItem('workspace_id', data.workspace_id);
-        alert('✅ 팀 배정 완료!');
+        alert('팀 배정 완료!');
         window.location.reload();
       } else {
-        alert('❌ 유효하지 않은 코드입니다.');
+        alert('유효하지 않은 코드입니다.');
       }
     } catch {
       alert('팀 합류 실패!');

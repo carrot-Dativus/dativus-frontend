@@ -212,12 +212,22 @@ export default function AgentDashboard({ agentLogs, isStreaming, currentTrace, l
     const customNameSet = new Set(customAgentList.map(a => a.name));
 
     for (const log of agentLogs) {
+      // 일반 로그: [에이전트명] 형식
       const match = log.match(/\[([^\]]+)\]/);
-      if (!match) continue;
-      const name = match[1];
-      names.add(name);
-      const deptId = customNameSet.has(name) ? 'custom' : AGENT_TO_DEPT[name];
-      if (deptId) lastDept = deptId;
+      if (match) {
+        const name = match[1];
+        names.add(name);
+        const deptId = customNameSet.has(name) ? 'custom' : AGENT_TO_DEPT[name];
+        if (deptId) lastDept = deptId;
+      }
+      // 다중 에이전트 로그: "다중 에이전트 활성화: A, B, C" (대괄호 없음)
+      const multiMatch = log.match(/다중 에이전트 활성화: (.+)/);
+      if (multiMatch) {
+        for (const name of multiMatch[1].split(', ').map(n => n.trim())) {
+          names.add(name);
+          if (customNameSet.has(name)) lastDept = 'custom';
+        }
+      }
       if (log.includes('반려')) hasRejection = true;
     }
 
@@ -263,7 +273,7 @@ export default function AgentDashboard({ agentLogs, isStreaming, currentTrace, l
   const reviewActive = deptStatus['review'] === 'active' || deptStatus['review'] === 'done' || deptStatus['review'] === 'rejected';
 
   return (
-    <div style={{ padding: '20px', minHeight: '100%', backgroundColor: '#09090f', borderRadius: '8px', fontFamily: "'Consolas', 'D2Coding', 'Malgun Gothic', monospace" }}>
+    <div style={{ padding: '20px', backgroundColor: '#09090f', borderRadius: '8px', fontFamily: "'Consolas', 'D2Coding', 'Malgun Gothic', monospace" }}>
       {/* 헤더 */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -318,7 +328,7 @@ export default function AgentDashboard({ agentLogs, isStreaming, currentTrace, l
           padding: '8px 14px', backgroundColor: '#0f0f1a', borderRadius: '6px',
           border: '1px solid #1a1a2e', fontSize: '12px', color: '#888',
         }}>
-          <span>⏱ {stats.latency}s</span>
+          <span>{stats.latency}s</span>
           {stats.tokens && <span>{stats.tokens} tokens</span>}
           <span>{completedAgentNames.size} nodes</span>
         </div>
@@ -327,13 +337,7 @@ export default function AgentDashboard({ agentLogs, isStreaming, currentTrace, l
       {/* 로그 */}
       <div style={{ borderTop: '1px solid #1a1a2e', paddingTop: '12px' }}>
         <div style={{ fontSize: '10px', color: '#333', marginBottom: '8px', letterSpacing: '1.5px', fontWeight: '600' }}>LOG</div>
-        <style>{`
-          .dashboard-log::-webkit-scrollbar { width: 4px; }
-          .dashboard-log::-webkit-scrollbar-track { background: #09090f; }
-          .dashboard-log::-webkit-scrollbar-thumb { background: #2a2a40; border-radius: 4px; }
-          .dashboard-log::-webkit-scrollbar-thumb:hover { background: #3a3a55; }
-        `}</style>
-        <div className="dashboard-log" style={{ maxHeight: '160px', overflowY: 'auto' }}>
+        <div className="dark-scroll" style={{ maxHeight: '160px', overflowY: 'auto' }}>
           {agentLogs.length === 0 && (
             <div style={{ color: '#333', fontSize: '12px' }}>
               {isStreaming ? '초기화 중...' : '질문을 입력하면 워크플로우가 시작됩니다.'}

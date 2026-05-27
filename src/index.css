@@ -110,6 +110,24 @@ code {
   background: var(--code-bg);
 }
 
+/* ── 스크롤바 스타일: 채팅 패널 (라이트) ── */
+.chat-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+.chat-scroll::-webkit-scrollbar-track { background: transparent; }
+.chat-scroll::-webkit-scrollbar-thumb { background: #d4d4d4; border-radius: 6px; }
+.chat-scroll::-webkit-scrollbar-thumb:hover { background: #b0b0b0; }
+
+/* ── 스크롤바 스타일: 사이드바 채널 목록 ── */
+.channel-scroll::-webkit-scrollbar { width: 3px; }
+.channel-scroll::-webkit-scrollbar-track { background: transparent; }
+.channel-scroll::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 4px; }
+.channel-scroll::-webkit-scrollbar-thumb:hover { background: #bbb; }
+
+/* ── 스크롤바 스타일: 워크플로우 패널 (다크) ── */
+.dark-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+.dark-scroll::-webkit-scrollbar-track { background: #09090f; }
+.dark-scroll::-webkit-scrollbar-thumb { background: #2a2a40; border-radius: 4px; }
+.dark-scroll::-webkit-scrollbar-thumb:hover { background: #3d3d60; }
+
 /* code block (pre > code) 전용 — SyntaxHighlighter 스타일 보존 */
 pre code {
   display: block !important;

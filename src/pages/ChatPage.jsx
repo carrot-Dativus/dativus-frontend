@@ -1,7 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/axiosInstance';
-import dativusLogo from '../assets/Dativus_logo.png';
 
 import Sidebar from '../components/Sidebar';
 import ChatArea from '../components/ChatArea';
@@ -15,6 +14,22 @@ import { useWorkspace } from '../hooks/useWorkspace';
 import { useDocuments } from '../hooks/useDocuments';
 import { useAgents } from '../hooks/useAgents';
 
+function ResizeDivider({ onMouseDown }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        width: '4px', flexShrink: 0, cursor: 'col-resize', zIndex: 10,
+        backgroundColor: hovered ? 'rgba(0,0,0,0.15)' : 'transparent',
+        transition: 'background-color 0.2s',
+      }}
+    />
+  );
+}
+
 export default function ChatPage() {
   const navigate = useNavigate();
 
@@ -25,19 +40,90 @@ export default function ChatPage() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isDocManagerOpen, setIsDocManagerOpen] = useState(false);
   const [isAgentCreateOpen, setIsAgentCreateOpen] = useState(false);
+  const [isAgentEditOpen, setIsAgentEditOpen] = useState(false);
 
-  // --- 캔버스 ---
-  const [isCanvasOpen, setIsCanvasOpen] = useState(false);
-  const [canvasData, setCanvasData] = useState(() => {
+  // --- 패널 크기 조절 ---
+  const [sidebarWidth, setSidebarWidth] = useState(260);
+  const [canvasWidth, setCanvasWidth] = useState(420);
+
+  const startSidebarResize = useCallback((e) => {
+    const startX = e.clientX;
+    const startW = sidebarWidth;
+    const onMove = (ev) => setSidebarWidth(Math.max(180, Math.min(440, startW + ev.clientX - startX)));
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [sidebarWidth]);
+
+  const startCanvasResize = useCallback((e) => {
+    const startX = e.clientX;
+    const startW = canvasWidth;
+    const onMove = (ev) => setCanvasWidth(Math.max(240, Math.min(700, startW - (ev.clientX - startX))));
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [canvasWidth]);
+
+  // --- 사이드바 ---
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
     try {
-      const saved = sessionStorage.getItem('dativus_canvas_data');
-      return saved ? JSON.parse(saved) : null;
-    } catch { return null; }
+      const saved = sessionStorage.getItem('sb_open');
+      return saved !== null ? saved === 'true' : true;
+    } catch { return true; }
   });
+
+  // --- 선택된 세션 (탭별 독립 관리) ---
+  const [teamSessionId, setTeamSessionId] = useState(null);     // 팀 탭에서 볼 세션
+  const [teamChannelMode, setTeamChannelMode] = useState('AI'); // 현재 팀 채널의 채팅 모드
+  const [privateSessionId, setPrivateSessionId] = useState(null); // 개인 탭에서 볼 세션
 
   // --- 탭 / 입력창 ---
   const [currentTab, setCurrentTab] = useState('TEAM');
   const [input, setInput] = useState('');
+
+  // --- 캔버스 (PRIVATE / TEAM 분리) ---
+  const [privateCanvas, setPrivateCanvas] = useState(() => {
+    try { return { isOpen: false, data: JSON.parse(sessionStorage.getItem('canvas_private') || 'null') }; }
+    catch { return { isOpen: false, data: null }; }
+  });
+  const [teamCanvas, setTeamCanvas] = useState(() => {
+    try { return { isOpen: false, data: JSON.parse(sessionStorage.getItem('canvas_team') || 'null') }; }
+    catch { return { isOpen: false, data: null }; }
+  });
+
+  const panelCanvases = { PRIVATE: privateCanvas, TEAM: teamCanvas };
+
+  const handleToggleCanvas = (tab) => {
+    if (tab === 'PRIVATE') setPrivateCanvas(prev => ({ ...prev, isOpen: !prev.isOpen }));
+    else setTeamCanvas(prev => ({ ...prev, isOpen: !prev.isOpen }));
+  };
+
+  // 현재 탭 기준 활성 캔버스 (CanvasArea에 전달)
+  const activeCanvas = currentTab === 'PRIVATE' ? privateCanvas : teamCanvas;
+  const isCanvasOpen = activeCanvas.isOpen;
+  const canvasData = activeCanvas.data;
+  const setIsCanvasOpen = (open) => {
+    if (currentTab === 'PRIVATE') setPrivateCanvas(prev => ({ ...prev, isOpen: open }));
+    else setTeamCanvas(prev => ({ ...prev, isOpen: open }));
+  };
+
+  // currentTab ref — dashboardData effect 스테일 클로저 방지
+  const currentTabRef = useRef(currentTab);
+  useEffect(() => { currentTabRef.current = currentTab; }, [currentTab]);
 
   // --- 스크롤 ---
   const chatEndRef = useRef(null);
@@ -51,19 +137,20 @@ export default function ChatPage() {
     messages, privateMessages, agentLogs,
     dashboardData,
     clarifyData, setClarifyData,
-    sendMessage, shareToTeam, sendFeedback,
+    sendMessage, shareToTeam, sendFeedback, removeMessage,
     isStreaming, currentTrace,
     resetDashboard,
-  } = useChatSession(workspaceId, currentUserId);
+  } = useChatSession(workspaceId, currentUserId, teamSessionId, privateSessionId);
 
-  // 대시보드 데이터 수신 시 캔버스 자동 오픈 + sessionStorage 동기화
+  // 대시보드 데이터 수신 시 현재 탭 캔버스에 저장 + 자동 오픈 (ref로 스테일 클로저 방지)
   useEffect(() => {
-    if (dashboardData) {
-      setCanvasData(dashboardData);
-      setIsCanvasOpen(true);
-      try {
-        sessionStorage.setItem('dativus_canvas_data', JSON.stringify(dashboardData));
-      } catch { /* 무시 */ }
+    if (!dashboardData) return;
+    if (currentTabRef.current === 'PRIVATE') {
+      setPrivateCanvas({ isOpen: true, data: dashboardData });
+      try { sessionStorage.setItem('canvas_private', JSON.stringify(dashboardData)); } catch {}
+    } else {
+      setTeamCanvas({ isOpen: true, data: dashboardData });
+      try { sessionStorage.setItem('canvas_team', JSON.stringify(dashboardData)); } catch {}
     }
   }, [dashboardData]);
 
@@ -119,39 +206,82 @@ export default function ChatPage() {
   // =========================================================================
   // 핸들러 (훅 결과를 조립해서 컴포넌트에 전달)
   // =========================================================================
+  const isSendingRef = useRef(false);
   const handleSendMessage = async () => {
     if (!input.trim()) return;
+    const activeSessionId = currentTab === 'PRIVATE' ? privateSessionId : teamSessionId;
+    if (!activeSessionId) return; // 세션 미선택 → input 보존
+    if (isSendingRef.current) return; // 더블 전송 방지
+    isSendingRef.current = true;
     const userQuery = input;
     setInput('');
-    await sendMessage({ userQuery, currentTab, selectedAgent, agentList });
+    const existingDashboard = currentTab === 'PRIVATE' ? privateCanvas.data : teamCanvas.data;
+    // 팀 채팅 전용 채널이면 AI 없이 메시지만 전송
+    const activeChannelMode = currentTab === 'TEAM' ? teamChannelMode : 'AI';
+    try {
+      await sendMessage({ userQuery, currentTab, selectedAgent, agentList, existingDashboard, channelMode: activeChannelMode });
+    } finally {
+      isSendingRef.current = false;
+    }
   };
 
   const handleShareToTeam = (content) =>
     shareToTeam({ sessionId, content, currentUserId });
 
-  const handleFeedback = (isPositive, query, answer) =>
+  const handleFeedback = (isPositive, query, answer, msg, isPrivate) => {
     sendFeedback({ workspaceId, userId: currentUserId, query, answer, isPositive });
+    if (!isPositive && msg) removeMessage(msg, isPrivate);
+  };
 
   const handleClarifySubmit = (selectedOptions, otherText) => {
     const { originalQuery } = clarifyData;
     const extras = [...selectedOptions, otherText].filter(Boolean).join(', ');
     const enrichedQuery = `${originalQuery} [추가 정보: ${extras}]`;
     setClarifyData(null);
-    sendMessage({ userQuery: enrichedQuery, currentTab, selectedAgent, agentList });
+    const existingDashboard = currentTab === 'PRIVATE' ? privateCanvas.data : teamCanvas.data;
+    sendMessage({ userQuery: enrichedQuery, currentTab, selectedAgent, agentList, existingDashboard });
   };
 
   const handleResetCanvas = () => {
-    setCanvasData(null);
+    if (currentTab === 'PRIVATE') {
+      setPrivateCanvas({ isOpen: false, data: null });
+      try { sessionStorage.removeItem('canvas_private'); } catch {}
+    } else {
+      setTeamCanvas({ isOpen: false, data: null });
+      try { sessionStorage.removeItem('canvas_team'); } catch {}
+    }
     resetDashboard();
-    try { sessionStorage.removeItem('dativus_canvas_data'); } catch { /* 무시 */ }
+  };
+
+  const handleOpenEditAgent = (agent) => {
+    setEditingAgent({ id: agent.id, name: agent.name, description: agent.description, agentType: agent.agentType, threshold: agent.threshold ?? 0.38 });
+    setIsAgentEditOpen(true);
   };
 
   const handleClarifyCancel = () => {
     const originalQuery = clarifyData?.originalQuery;
     setClarifyData(null);
     if (originalQuery) {
-      sendMessage({ userQuery: `[skip] ${originalQuery}`, currentTab, selectedAgent, agentList });
+      const existingDashboard = currentTab === 'PRIVATE' ? privateCanvas.data : teamCanvas.data;
+      sendMessage({ userQuery: `[skip] ${originalQuery}`, currentTab, selectedAgent, agentList, existingDashboard });
     }
+  };
+
+  // 팀 채팅방 클릭 → 팀 탭 세션 교체 + 탭 전환
+  const handleSelectTeamSession = (id, channelMode = 'AI') => {
+    setTeamSessionId(id);
+    setTeamChannelMode(channelMode);
+    setCurrentTab('TEAM');
+    setTeamCanvas(prev => ({ ...prev, isOpen: false }));
+    setClarifyData(null);
+  };
+
+  // 개인 AI 채팅 클릭 → 개인 탭 세션 교체 + 탭 전환
+  const handleSelectPrivateSession = (id) => {
+    setPrivateSessionId(id);
+    setCurrentTab('PRIVATE');
+    setPrivateCanvas(prev => ({ ...prev, isOpen: false }));
+    setClarifyData(null);
   };
 
   const handleSetCurrentTab = (tab) => {
@@ -163,33 +293,33 @@ export default function ChatPage() {
   // 렌더링
   // =========================================================================
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', position: 'relative' }}>
-
-      <header className="header" style={{ display: 'flex', justifyContent: 'space-between', padding: '20px 50px', borderBottom: '1px solid #eee' }}>
-        <img src={dativusLogo} alt="Dativus" style={{ height: '30px', objectFit: 'contain' }} />
-        <div className="top-nav">
-          <button className="btn-top-login" onClick={() => navigate('/mypage')} style={{ marginRight: '10px' }}>마이페이지</button>
-          <button className="btn-top-login" onClick={() => apiClient.logout()}>로그아웃</button>
-        </div>
-      </header>
+    <div style={{ display: 'flex', height: '100vh', position: 'relative' }}>
 
       <div className="layout-grid" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <Sidebar
+          width={sidebarWidth}
+          isOpen={isSidebarOpen}
+          setIsOpen={setIsSidebarOpen}
           setIsUploadOpen={setIsUploadOpen}
           setIsDocManagerOpen={setIsDocManagerOpen}
           setIsAgentCreateOpen={setIsAgentCreateOpen}
           agentList={agentList}
-          editingAgent={editingAgent} setEditingAgent={setEditingAgent}
-          handleUpdateAgent={handleUpdateAgent} handleDeleteAgent={handleDeleteAgent}
+          onEditAgent={handleOpenEditAgent} handleDeleteAgent={handleDeleteAgent}
           newTeamName={newTeamName} setNewTeamName={setNewTeamName} handleCreateTeam={handleCreateTeam}
           inviteCode={inviteCode} setInviteCode={setInviteCode} handleJoinTeam={handleJoinTeam}
           workspaces={workspaces} workspaceId={workspaceId}
+          currentUserId={currentUserId}
+          teamSessionId={teamSessionId}
+          privateSessionId={privateSessionId}
+          onSelectTeamSession={handleSelectTeamSession}
+          onSelectPrivateSession={handleSelectPrivateSession}
         />
+        {isSidebarOpen && <ResizeDivider onMouseDown={startSidebarResize} />}
 
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           <ChatArea
             currentTab={currentTab} setCurrentTab={handleSetCurrentTab}
-            isCanvasOpen={isCanvasOpen} setIsCanvasOpen={setIsCanvasOpen}
+            panelCanvases={panelCanvases} onToggleCanvas={handleToggleCanvas}
             privateMessages={privateMessages} messages={messages} agentLogs={agentLogs}
             chatEndRef={chatEndRef} logEndRef={logEndRef}
             handleShareToTeam={handleShareToTeam} handleFeedback={handleFeedback}
@@ -199,9 +329,12 @@ export default function ChatPage() {
             onClarifySubmit={handleClarifySubmit}
             onClarifyCancel={handleClarifyCancel}
             isStreaming={isStreaming} currentTrace={currentTrace}
+            teamChannelMode={teamChannelMode}
           />
+          {isCanvasOpen && <ResizeDivider onMouseDown={startCanvasResize} />}
           <CanvasArea
-            isCanvasOpen={isCanvasOpen} setIsCanvasOpen={setIsCanvasOpen} canvasData={canvasData}
+            isCanvasOpen={isCanvasOpen} setIsCanvasOpen={setIsCanvasOpen}
+            canvasData={canvasData} canvasWidth={canvasWidth}
             onReset={handleResetCanvas}
           />
         </div>
@@ -228,10 +361,21 @@ export default function ChatPage() {
 
       {isAgentCreateOpen && (
         <AgentCreateModal
-          agentForm={agentForm}
-          setAgentForm={setAgentForm}
-          onCreate={handleCreateAgent}
+          form={agentForm}
+          setForm={setAgentForm}
+          onSubmit={handleCreateAgent}
+          isEdit={false}
           onClose={() => setIsAgentCreateOpen(false)}
+        />
+      )}
+
+      {isAgentEditOpen && editingAgent && (
+        <AgentCreateModal
+          form={editingAgent}
+          setForm={setEditingAgent}
+          onSubmit={handleUpdateAgent}
+          isEdit={true}
+          onClose={() => { setIsAgentEditOpen(false); setEditingAgent(null); }}
         />
       )}
 

@@ -19,7 +19,8 @@ async function tryRefreshToken() {
   });
 
   if (!response.ok) {
-    localStorage.clear();
+    localStorage.removeItem('token');
+    localStorage.removeItem('refresh_token');
     window.location.href = '/login';
     throw new Error('토큰 갱신 실패');
   }

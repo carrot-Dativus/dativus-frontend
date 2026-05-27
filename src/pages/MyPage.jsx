@@ -12,47 +12,56 @@ export default function MyPage() {
     decisionStyle, setDecisionStyle,
     expertise, setExpertise,
     tone, setTone,
+    personaMemo, setPersonaMemo,
     stats,
+    docList,
+    agentList,
+    agentUsage,
+    dailyStats,
     handleSavePersona,
   } = useMyPage();
 
   return (
-    <>
-      <header className="header" style={{ display: 'flex', justifyContent: 'space-between', padding: '20px 50px', borderBottom: '1px solid #eee' }}>
-        <img src={dativusLogo} alt="Dativus" onClick={() => navigate('/chat')} style={{ height: '30px', objectFit: 'contain', cursor: 'pointer' }} />
-        <div className="top-nav">
-          <button className="btn-top-login" onClick={() => apiClient.logout()}>로그아웃</button>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 50px', borderBottom: '1px solid #eee', backgroundColor: '#fff' }}>
+        <img src={dativusLogo} alt="Dativus" onClick={() => navigate('/')} style={{ height: '30px', objectFit: 'contain', cursor: 'pointer' }} />
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button
+            onClick={() => navigate('/chat')}
+            style={{ padding: '7px 16px', border: '1px solid #e0e0e0', borderRadius: '8px', background: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: '#555' }}
+          >
+            채팅방으로
+          </button>
+          <button
+            onClick={() => apiClient.logout()}
+            style={{ padding: '7px 16px', border: 'none', borderRadius: '8px', background: '#111', cursor: 'pointer', fontSize: '13px', fontWeight: '600', color: '#fff' }}
+          >
+            로그아웃
+          </button>
         </div>
       </header>
 
-      <div style={{ textAlign: 'center', padding: '50px 0 40px 0' }}>
-        <h1 style={{ fontSize: '38px', letterSpacing: '10px', fontWeight: '700', margin: 0 }}>마이페이지</h1>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', width: '100%' }}>
-
-        {/* 사이드바 */}
-        <div style={{ borderRight: '3px solid #dbdbdb', padding: '20px 20px 60px 40px' }}>
-          <div style={{ color: '#000', fontSize: '20px', fontWeight: '700', textDecoration: 'underline', textUnderlineOffset: '8px', cursor: 'pointer' }}>마이페이지</div>
-          <div style={{ color: '#888', fontSize: '18px', fontWeight: '700', marginTop: '40px', cursor: 'pointer' }} onClick={() => navigate('/chat')}>채팅방으로 이동</div>
+      <div style={{ maxWidth: '900px', margin: '0 auto', padding: '48px 24px 80px' }}>
+        <div style={{ marginBottom: '36px' }}>
+          <div style={{ fontSize: '22px', fontWeight: '700', color: '#111', letterSpacing: '1px' }}>마이페이지</div>
+          <div style={{ fontSize: '13px', color: '#999', marginTop: '4px' }}>계정 정보 및 AI 성향을 관리합니다</div>
         </div>
 
-        {/* 메인 콘텐츠 */}
-        <div style={{ padding: '20px 100px 60px 100px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '50px' }}>
-            <PersonaCard
-              email={email}
-              username={username}
-              decisionStyle={decisionStyle} setDecisionStyle={setDecisionStyle}
-              expertise={expertise} setExpertise={setExpertise}
-              tone={tone} setTone={setTone}
-              onSave={handleSavePersona}
-            />
-            <QualityDashboard stats={stats} />
-          </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <PersonaCard
+            email={email}
+            username={username}
+            decisionStyle={decisionStyle} setDecisionStyle={setDecisionStyle}
+            expertise={expertise} setExpertise={setExpertise}
+            tone={tone} setTone={setTone}
+            personaMemo={personaMemo} setPersonaMemo={setPersonaMemo}
+            onSave={handleSavePersona}
+          />
+          <QualityDashboard stats={stats} docList={docList} agentList={agentList} agentUsage={agentUsage} dailyStats={dailyStats} />
         </div>
-
       </div>
-    </>
+
+    </div>
   );
 }
