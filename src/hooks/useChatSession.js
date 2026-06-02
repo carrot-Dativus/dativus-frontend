@@ -63,6 +63,11 @@ export function useChatSession(workspaceId, currentUserId, teamSessionId, privat
 
   const handleTeamMessage = useCallback((msg) => {
     if (teamSessionIdRef.current && msg.sessionId && msg.sessionId !== teamSessionIdRef.current) return;
+    // 팀 캔버스 실시간 동기화
+    if (msg.type === 'canvas_update') {
+      setDashboardData(msg.data);
+      return;
+    }
     // WS 페이로드의 senderName을 메시지 객체에 포함
     setMessages(prev => [...prev, { ...msg, senderName: msg.senderName || '' }]);
   }, []);
@@ -72,11 +77,19 @@ export function useChatSession(workspaceId, currentUserId, teamSessionId, privat
   const teamLoadedRef = useRef(null);
   const privateLoadedRef = useRef(null);
 
-  // 팀 세션 전환 → messages 초기화 후 로드
+  // 팀 세션 전환 → messages 초기화 후 로드 + 채널 캔버스 복원
   useEffect(() => {
     setMessages([]);
+    setDashboardData(null);
     teamLoadedRef.current = null;
     if (!teamSessionId) return;
+
+    // 이 채널에 저장된 캔버스 복원
+    apiClient.get(`/api/v1/chats/session/${teamSessionId}/canvas`)
+      .then(res => (res.ok && res.status !== 204) ? res.json() : null)
+      .then(data => { if (data) setDashboardData(data); })
+      .catch(() => {});
+
     const key = `${sessionCacheKey(teamSessionId)}_team`;
     const cached = loadMsgs(key);
     if (cached?.length > 0) {
@@ -133,6 +146,9 @@ export function useChatSession(workspaceId, currentUserId, teamSessionId, privat
     if (!userQuery.trim() || !activeSessionId) return;
 
     const personaMemo = localStorage.getItem('persona_memo') || '';
+    const personaExpertise = localStorage.getItem('persona_expertise') || '';
+    const personaTone = localStorage.getItem('persona_tone') || '';
+    const personaDecisionStyle = localStorage.getItem('persona_decision_style') || '';
     const myName = localStorage.getItem('username') || '팀원';
 
     const targetSetMessages = isPrivateMode ? setPrivateMessages : setMessages;
@@ -192,6 +208,9 @@ export function useChatSession(workspaceId, currentUserId, teamSessionId, privat
           custom_agents_list: (!selectedAgent && agentList.length > 0)
             ? agentList.filter(a => !a._builtin).map(a => ({ name: a.name, description: a.description, threshold: a.threshold ?? 0.38 }))
             : [],
+          persona_expertise: personaExpertise,
+          persona_tone: personaTone,
+          persona_decision_style: personaDecisionStyle,
           persona_memo: personaMemo,
           existing_dashboard: existingDashboard ?? null,
         }),
@@ -236,6 +255,10 @@ export function useChatSession(workspaceId, currentUserId, teamSessionId, privat
             try {
               const parsed = JSON.parse(dataText.substring(11));
               setDashboardData(parsed);
+              // 팀 채널: 백엔드에 저장 → 다른 팀원에게 WS 브로드캐스트
+              if (!isPrivateMode) {
+                apiClient.put(`/api/v1/chats/session/${activeSessionId}/canvas`, parsed).catch(() => {});
+              }
             } catch (e) {
               console.warn('대시보드 JSON 파싱 실패:', e);
             }

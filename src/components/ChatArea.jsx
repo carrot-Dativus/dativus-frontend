@@ -193,6 +193,8 @@ function AgentDropdown({ selectedAgentId, setSelectedAgentId, agentList }) {
     { value: 'general_agent', label: '일반 대화' },
     { value: 'expert_agent', label: '전문 분석' },
     { value: 'coding_math_agent', label: '코딩 / 수학' },
+    { value: 'local_test', label: '로컬 테스트', isLocal: true },
+    { value: 'pure_llm',   label: '순수 LLM',   isLocal: true },
   ];
 
   const selectedLabel =
@@ -237,7 +239,7 @@ function AgentDropdown({ selectedAgentId, setSelectedAgentId, agentList }) {
           minWidth: '200px', zIndex: 100, padding: '8px',
         }}>
           <div style={{ fontSize: '11px', fontWeight: '700', color: '#bbb', padding: '4px 12px 6px', letterSpacing: '0.5px' }}>기본 에이전트</div>
-          {builtinOptions.map(opt => (
+          {builtinOptions.filter(o => !o.isLocal).map(opt => (
             <button
               key={opt.value}
               onClick={() => { setSelectedAgentId(opt.value); setIsOpen(false); }}
@@ -246,6 +248,20 @@ function AgentDropdown({ selectedAgentId, setSelectedAgentId, agentList }) {
               style={itemStyle(selectedAgentId === opt.value)}
             >
               <span>{opt.label}</span>
+              {selectedAgentId === opt.value && <span style={{ fontSize: '11px', color: '#6366f1', fontWeight: '700' }}>✓</span>}
+            </button>
+          ))}
+          <div style={{ height: '1px', backgroundColor: '#f0f0f0', margin: '6px 0' }} />
+          <div style={{ fontSize: '11px', fontWeight: '700', color: '#bbb', padding: '4px 12px 6px', letterSpacing: '0.5px' }}>개발 / 테스트</div>
+          {builtinOptions.filter(o => o.isLocal).map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => { setSelectedAgentId(opt.value); setIsOpen(false); }}
+              onMouseEnter={e => { if (selectedAgentId !== opt.value) e.currentTarget.style.background = '#fafafa'; }}
+              onMouseLeave={e => { if (selectedAgentId !== opt.value) e.currentTarget.style.background = 'transparent'; }}
+              style={{ ...itemStyle(selectedAgentId === opt.value), color: selectedAgentId === opt.value ? '#111' : '#888' }}
+            >
+              <span>🖥 {opt.label}</span>
               {selectedAgentId === opt.value && <span style={{ fontSize: '11px', color: '#6366f1', fontWeight: '700' }}>✓</span>}
             </button>
           ))}

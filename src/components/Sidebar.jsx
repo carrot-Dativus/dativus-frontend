@@ -97,15 +97,21 @@ export default function Sidebar({
         if (res.ok) {
           const data = await res.json();
           setSessions(data);
-          // 최초 로드 시 팀/개인 채널 자동 선택
+          // 최초 로드 시 팀/개인 채널 자동 선택 (마지막 방문 채널 복원)
           if (!hasAutoSelected.current) {
             hasAutoSelected.current = true;
             if (data.teamChannels.length > 0 && !teamSessionId) {
-              const first = data.teamChannels[0];
-              onSelectTeamSession?.(first.id, first.channelMode || 'AI');
+              const lastId = localStorage.getItem('lastTeamSessionId');
+              const restored = lastId && data.teamChannels.find(ch => ch.id === lastId);
+              const target = restored || data.teamChannels[0];
+              onSelectTeamSession?.(target.id, target.channelMode || 'AI');
             }
-            if (data.personalChats.length > 0 && !privateSessionId)
-              onSelectPrivateSession?.(data.personalChats[0].id);
+            if (data.personalChats.length > 0 && !privateSessionId) {
+              const lastId = localStorage.getItem('lastPrivateSessionId');
+              const restored = lastId && data.personalChats.find(c => c.id === lastId);
+              const target = restored || data.personalChats[0];
+              onSelectPrivateSession?.(target.id);
+            }
           }
         }
       } catch (e) {
@@ -353,7 +359,7 @@ export default function Sidebar({
                 const accentColor = isChat ? '#3b82f6' : '#6366f1';
                 return (
                   <div key={ch.id}
-                    onClick={() => { onSelectTeamSession?.(ch.id, ch.channelMode || 'AI'); setSubPanel(null); }}
+                    onClick={() => { onSelectTeamSession?.(ch.id, ch.channelMode || 'AI'); localStorage.setItem('lastTeamSessionId', ch.id); setSubPanel(null); }}
                     style={{
                       padding: '8px 10px 8px 12px', borderRadius: '8px', cursor: 'pointer',
                       backgroundColor: isActive ? '#111' : 'transparent',
@@ -387,7 +393,7 @@ export default function Sidebar({
                 const isActive = privateSessionId === chat.id;
                 return (
                   <div key={chat.id}
-                    onClick={() => { onSelectPrivateSession?.(chat.id); setSubPanel(null); }}
+                    onClick={() => { onSelectPrivateSession?.(chat.id); localStorage.setItem('lastPrivateSessionId', chat.id); setSubPanel(null); }}
                     style={{
                       padding: '8px 10px 8px 12px', borderRadius: '8px', cursor: 'pointer',
                       backgroundColor: isActive ? '#111' : 'transparent',

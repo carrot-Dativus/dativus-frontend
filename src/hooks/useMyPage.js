@@ -41,6 +41,9 @@ export function useMyPage() {
           setPersonaMemo(memo);
           // 채팅에서 API 호출 없이 바로 사용할 수 있도록 최신값 동기화
           localStorage.setItem('persona_memo', memo);
+          localStorage.setItem('persona_expertise', data.expertise || '');
+          localStorage.setItem('persona_tone', data.tone || '');
+          localStorage.setItem('persona_decision_style', data.decisionStyle || '');
         }
 
         const statsRes = await apiClient.get(`/api/v1/feedback/stats/${currentUserId}`);
@@ -78,6 +81,9 @@ export function useMyPage() {
       if (response.ok) {
         // 채팅에서 매번 API 호출 없이 바로 사용할 수 있도록 로컬 캐싱
         localStorage.setItem('persona_memo', personaMemo);
+        localStorage.setItem('persona_expertise', expertise);
+        localStorage.setItem('persona_tone', tone);
+        localStorage.setItem('persona_decision_style', decisionStyle);
         alert('AI 어시스턴트의 성향이 업데이트되었습니다.');
       }
     } catch {

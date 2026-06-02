@@ -3,9 +3,11 @@ import { apiClient } from '../api/axiosInstance';
 
 // 빌트인 에이전트 — DB 저장 없이 force_agent로 처리
 const BUILTIN_AGENTS = [
-  { id: 'general_agent',      name: '일반 대화',  description: '', _builtin: true },
-  { id: 'expert_agent',       name: '전문 분석',  description: '', _builtin: true },
+  { id: 'general_agent',      name: '일반 대화',   description: '', _builtin: true },
+  { id: 'expert_agent',       name: '전문 분석',   description: '', _builtin: true },
   { id: 'coding_math_agent',  name: '코딩 / 수학', description: '', _builtin: true },
+  { id: 'local_test',         name: '로컬 테스트', description: '', _builtin: true },
+  { id: 'pure_llm',           name: '순수 LLM',   description: '', _builtin: true },
 ];
 
 export function useAgents(currentUserId) {

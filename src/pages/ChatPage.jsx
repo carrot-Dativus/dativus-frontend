@@ -97,11 +97,11 @@ export default function ChatPage() {
 
   // --- 캔버스 (PRIVATE / TEAM 분리) ---
   const [privateCanvas, setPrivateCanvas] = useState(() => {
-    try { return { isOpen: false, data: JSON.parse(sessionStorage.getItem('canvas_private') || 'null') }; }
+    try { return { isOpen: false, data: JSON.parse(localStorage.getItem('canvas_private') || 'null') }; }
     catch { return { isOpen: false, data: null }; }
   });
   const [teamCanvas, setTeamCanvas] = useState(() => {
-    try { return { isOpen: false, data: JSON.parse(sessionStorage.getItem('canvas_team') || 'null') }; }
+    try { return { isOpen: false, data: JSON.parse(localStorage.getItem('canvas_team') || 'null') }; }
     catch { return { isOpen: false, data: null }; }
   });
 
@@ -147,10 +147,10 @@ export default function ChatPage() {
     if (!dashboardData) return;
     if (currentTabRef.current === 'PRIVATE') {
       setPrivateCanvas({ isOpen: true, data: dashboardData });
-      try { sessionStorage.setItem('canvas_private', JSON.stringify(dashboardData)); } catch {}
+      try { localStorage.setItem('canvas_private', JSON.stringify(dashboardData)); } catch {}
     } else {
       setTeamCanvas({ isOpen: true, data: dashboardData });
-      try { sessionStorage.setItem('canvas_team', JSON.stringify(dashboardData)); } catch {}
+      try { localStorage.setItem('canvas_team', JSON.stringify(dashboardData)); } catch {}
     }
   }, [dashboardData]);
 
@@ -193,6 +193,21 @@ export default function ChatPage() {
 
   // 초기 에이전트 목록 로드
   useEffect(() => { fetchAgents(); }, [currentUserId]);
+
+  // 로그인 직후 페르소나 복원 — logout 시 localStorage.clear()로 날아간 값을 DB에서 다시 채움
+  useEffect(() => {
+    if (!currentUserId) return;
+    apiClient.get(`/api/v1/users/${currentUserId}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!data) return;
+        localStorage.setItem('persona_memo', data.personaMemo || '');
+        localStorage.setItem('persona_expertise', data.expertise || '');
+        localStorage.setItem('persona_tone', data.tone || '');
+        localStorage.setItem('persona_decision_style', data.decisionStyle || '');
+      })
+      .catch(() => {});
+  }, [currentUserId]);
 
   // 탭 변경 시 스크롤
   useEffect(() => {
@@ -245,10 +260,10 @@ export default function ChatPage() {
   const handleResetCanvas = () => {
     if (currentTab === 'PRIVATE') {
       setPrivateCanvas({ isOpen: false, data: null });
-      try { sessionStorage.removeItem('canvas_private'); } catch {}
+      try { localStorage.removeItem('canvas_private'); } catch {}
     } else {
       setTeamCanvas({ isOpen: false, data: null });
-      try { sessionStorage.removeItem('canvas_team'); } catch {}
+      try { localStorage.removeItem('canvas_team'); } catch {}
     }
     resetDashboard();
   };

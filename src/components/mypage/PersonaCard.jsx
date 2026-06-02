@@ -51,9 +51,9 @@ export default function PersonaCard({
         <div>
           <label style={fieldLabelStyle}>판단 스타일</label>
           <select value={decisionStyle} onChange={(e) => setDecisionStyle(e.target.value)} style={selectStyle}>
-            <option value="일반적인">일반적인 (균형)</option>
-            <option value="논리적인">논리적인 (분석적)</option>
-            <option value="직관적인">직관적인 (창의적)</option>
+            <option value="일반적인">일반적인 (A/B/C 구조)</option>
+            <option value="간단하게">간단하게 (요약+핵심만)</option>
+            <option value="창의적인">창의적인 (test)</option>
           </select>
         </div>
         <div>
@@ -75,16 +75,43 @@ export default function PersonaCard({
         </div>
       </div>
 
+      {/* 고정 구조 안내 */}
+      <div style={{
+        backgroundColor: '#f8f8f8', borderRadius: '8px', padding: '12px 14px',
+        marginBottom: '16px', border: '1px solid #ebebeb',
+      }}>
+        <div style={{ fontSize: '11px', fontWeight: '700', color: '#555', marginBottom: '6px' }}>
+          항상 유지되는 답변 구조
+        </div>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {['A / B / C 선택지', '요약', '넥스트 스텝'].map((tag) => (
+            <span key={tag} style={{
+              fontSize: '11px', padding: '3px 8px', borderRadius: '20px',
+              backgroundColor: '#111', color: '#fff', fontWeight: '600',
+            }}>{tag}</span>
+          ))}
+        </div>
+      </div>
+
       <div style={{ marginBottom: '20px' }}>
         <label style={fieldLabelStyle}>
-          추가 지시사항 <span style={{ fontWeight: '400', color: '#bbb' }}>— 자연어로 자유롭게 작성 (선택)</span>
+          추가 지시사항{' '}
+          <span style={{ fontWeight: '400', color: '#bbb' }}>— 말투·설명 깊이 등 스타일만 조정됩니다 (선택)</span>
         </label>
+        {/* 경고: 구조 변경 지시는 무시됨 */}
+        <div style={{
+          fontSize: '11px', color: '#e07b00', marginBottom: '6px',
+          padding: '6px 10px', backgroundColor: '#fff8f0', borderRadius: '6px',
+          border: '1px solid #fde8c8',
+        }}>
+          ⚠ 위 고정 구조를 없애거나 바꾸는 지시는 적용되지 않습니다.
+        </div>
         <textarea
           value={personaMemo}
           onChange={(e) => setPersonaMemo(e.target.value)}
-          placeholder={"예) 나는 백엔드 개발자야. 기초 설명은 생략하고 핵심만 짧게 답해줘.\n예) 답변을 항상 영어로 해줘.\n예) 모든 답변 끝에 한 줄 요약을 붙여줘."}
+          placeholder={"예) 기초 설명은 생략하고 핵심만 짧게 답해줘.\n예) 답변을 항상 영어로 해줘.\n예) 모든 답변 끝에 한 줄 요약을 붙여줘."}
           style={{
-            ...inputStyle, minHeight: '88px', resize: 'vertical',
+            ...inputStyle, minHeight: '80px', resize: 'vertical',
             fontFamily: 'inherit', lineHeight: '1.6',
           }}
         />
