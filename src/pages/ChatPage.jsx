@@ -138,7 +138,7 @@ export default function ChatPage() {
     dashboardData,
     clarifyData, setClarifyData,
     sendMessage, shareToTeam, sendFeedback, removeMessage,
-    isStreaming, currentTrace,
+    isStreaming, currentTrace, currentRoute,
     resetDashboard,
   } = useChatSession(workspaceId, currentUserId, teamSessionId, privateSessionId);
 
@@ -343,7 +343,7 @@ export default function ChatPage() {
             clarifyData={clarifyData}
             onClarifySubmit={handleClarifySubmit}
             onClarifyCancel={handleClarifyCancel}
-            isStreaming={isStreaming} currentTrace={currentTrace}
+            isStreaming={isStreaming} currentTrace={currentTrace} currentRoute={currentRoute}
             teamChannelMode={teamChannelMode}
           />
           {isCanvasOpen && <ResizeDivider onMouseDown={startCanvasResize} />}

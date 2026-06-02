@@ -56,6 +56,7 @@ export function useChatSession(workspaceId, currentUserId, teamSessionId, privat
   const [clarifyData, setClarifyData] = useState(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [currentTrace, setCurrentTrace] = useState('');
+  const [currentRoute, setCurrentRoute] = useState('');
 
   // 팀 탭 실시간 동기화 (WebSocket) — 현재 선택된 채널 메시지만 수신
   const teamSessionIdRef = useRef(teamSessionId);
@@ -187,6 +188,7 @@ export function useChatSession(workspaceId, currentUserId, teamSessionId, privat
     // 격리구역 1: AI 스트리밍
     setIsStreaming(true);
     setCurrentTrace('');
+    setCurrentRoute('');
     setAgentLogs([]);
     try {
       const token = localStorage.getItem('token');
@@ -205,8 +207,9 @@ export function useChatSession(workspaceId, currentUserId, teamSessionId, privat
           force_agent: selectedAgent?._builtin ? selectedAgent.id : null,
           target_agent_name: (!selectedAgent?._builtin && selectedAgent?.name) ? selectedAgent.name : null,
           target_agent_prompt: (!selectedAgent?._builtin && selectedAgent?.description) ? selectedAgent.description : null,
+          target_agent_type: (!selectedAgent?._builtin && selectedAgent?.agentType) ? selectedAgent.agentType : null,
           custom_agents_list: (!selectedAgent && agentList.length > 0)
-            ? agentList.filter(a => !a._builtin).map(a => ({ name: a.name, description: a.description, threshold: a.threshold ?? 0.38 }))
+            ? agentList.filter(a => !a._builtin).map(a => ({ name: a.name, description: a.description, threshold: a.threshold ?? 0.38, agent_type: a.agentType ?? 'EXTERNAL_API' }))
             : [],
           persona_expertise: personaExpertise,
           persona_tone: personaTone,
@@ -264,6 +267,7 @@ export function useChatSession(workspaceId, currentUserId, teamSessionId, privat
             }
           } else if (dataText.startsWith('[ROUTE]')) {
             const routeKey = dataText.substring(7);
+            setCurrentRoute(routeKey);
             const routeLabels = { general_agent: '일반', expert_agent: '전문가', coding_math_agent: '코딩/수학' };
             const routeLabel = routeLabels[routeKey] || '일반';
             apiClient.post('/api/v1/agents/usage', {
@@ -427,6 +431,7 @@ export function useChatSession(workspaceId, currentUserId, teamSessionId, privat
     removeMessage,
     isStreaming,
     currentTrace,
+    currentRoute,
     resetDashboard,
   };
 }

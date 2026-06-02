@@ -306,7 +306,7 @@ export default function ChatArea({
   selectedAgentId, setSelectedAgentId, agentList,
   input, setInput, handleSendMessage,
   clarifyData, onClarifySubmit, onClarifyCancel,
-  isStreaming, currentTrace,
+  isStreaming, currentTrace, currentRoute = '',
   teamChannelMode = 'AI',
 }) {
   const [selectedOptions, setSelectedOptions] = useState([]);
@@ -601,13 +601,17 @@ export default function ChatArea({
 
       <div className="input-bar" style={{
         display: 'flex',
-        backgroundColor: currentTab === 'TEAM' && teamChannelMode === 'CHAT'
-          ? 'rgba(59,130,246,0.08)'
-          : 'rgba(0,0,0,0.07)',
+        ...(() => {
+          if (currentTab === 'TEAM' && teamChannelMode === 'CHAT')
+            return { backgroundColor: 'rgba(59,130,246,0.08)', boxShadow: 'inset 0 0 0 1.5px rgba(59,130,246,0.45)' };
+          const routeColors = {
+            general_agent:    { backgroundColor: 'rgba(34,197,94,0.08)',  boxShadow: 'inset 0 0 0 1.5px rgba(34,197,94,0.55)' },
+            expert_agent:     { backgroundColor: 'rgba(99,102,241,0.08)', boxShadow: 'inset 0 0 0 1.5px rgba(99,102,241,0.55)' },
+            coding_math_agent:{ backgroundColor: 'rgba(249,115,22,0.08)', boxShadow: 'inset 0 0 0 1.5px rgba(249,115,22,0.55)' },
+          };
+          return routeColors[currentRoute] || { backgroundColor: 'rgba(0,0,0,0.07)', boxShadow: 'inset 0 0 0 1.5px rgba(0,0,0,0.35), inset 0 0 40px rgba(0,0,0,0.21)' };
+        })(),
         backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(2px)',
-        boxShadow: currentTab === 'TEAM' && teamChannelMode === 'CHAT'
-          ? 'inset 0 0 0 1.5px rgba(59,130,246,0.45)'
-          : 'inset 0 0 0 1.5px rgba(0,0,0,0.35), inset 0 0 40px rgba(0,0,0,0.21)',
         borderRadius: '40px',
         padding: '12px 20px', gap: '15px', alignItems: 'center',
         margin: '0 40px', flexShrink: 0,

@@ -20,12 +20,12 @@ const DEPARTMENTS = [
   {
     id: 'expert',
     name: '전문 분석팀',
-    desc: 'RAG 검색 · 전문 분석',
+    desc: 'RAG·웹 검색 · ReAct 분석',
     agents: [
-      { name: '자료 검색병', parallel: true },   // 3개 동시 병렬 실행
-      { name: '웹 검색병',   parallel: true },
-      { name: '관계망 추론병', parallel: true },
-      { name: '전문 분석병' },                   // 3개 완료 후 순차 실행
+      { name: '쿼리 재작성' },
+      { name: '선택적 검색' },
+      { name: '검색 품질 평가' },
+      { name: '전문 추론병(ReAct)' },
     ],
   },
   {
@@ -44,6 +44,7 @@ const DEPARTMENTS = [
     agents: [
       { name: '대시보드 분석' },
       { name: '문서 요약병' },
+      { name: '개인화 적용 중' },
       { name: '품질 검수 요원' },
       { name: '재작성 요원' },
     ],
@@ -52,21 +53,29 @@ const DEPARTMENTS = [
 ];
 
 const AGENT_TO_DEPT = {
-  '최고 관리자':      'supervisor',
-  '역질문 처리':      'supervisor',
-  '대화 기억병':      'general',
-  '일반 대화병':      'general',
-  '레퍼런스 검색병':  'coding',
-  '코딩/수학 전문병': 'coding',
-  '수색대 출격':      'expert',
-  '자료 검색병':      'expert',
-  '웹 검색병':        'expert',
-  '관계망 추론병':    'expert',
-  '전문 분석병':      'expert',
-  '대시보드 분석':    'review',
-  '문서 요약병':      'review',
-  '품질 검수 요원':   'review',
-  '재작성 요원':      'review',
+  '최고 관리자':          'supervisor',
+  '역질문 처리':          'supervisor',
+  '대화 기억병':          'general',
+  '일반 대화병':          'general',
+  '레퍼런스 검색병':      'coding',
+  '코딩/수학 전문병':     'coding',
+  // Phase 1 expert 노드 (구 노드명도 하위 호환 유지)
+  '수색대 출격':          'expert',
+  '자료 검색병':          'expert',
+  '웹 검색병':            'expert',
+  '관계망 추론병':        'expert',
+  '전문 분석병':          'expert',
+  '쿼리 재작성':          'expert',
+  '선택적 검색':          'expert',
+  '검색 품질 평가':       'expert',
+  '전문 추론병(ReAct)':   'expert',
+  '도구 실행':            'expert',
+  // review
+  '대시보드 분석':        'review',
+  '문서 요약병':          'review',
+  '개인화 적용 중':       'review',
+  '품질 검수 요원':       'review',
+  '재작성 요원':          'review',
 };
 
 const DEPT_STYLE = {
